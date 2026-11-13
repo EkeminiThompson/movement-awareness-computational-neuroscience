@@ -1,7 +1,7 @@
-# Participant-Independent Validation for Multimodal EEG–Kinematic Prediction: A Reproducible Leakage-Control Framework
+# Supplementary Methods: Participant-Independent Validation and Leakage Control for EEG–Kinematic Prediction
 
 **Author:** Ekemini Thompson  
-**Status:** Methods paper draft; no empirical performance results reported  
+**Status:** Supplementary methods note accompanying the primary IACKD protocol manuscript; no empirical performance results reported  
 **Project:** IACKD / OpenNeuro ds006840
 
 ## Abstract
@@ -14,7 +14,7 @@ Multimodal EEG–kinematic datasets contain repeated trials nested within partic
 
 Repeated trials from the same participant are statistically dependent and may contain participant-specific signatures. When trials are randomly divided between training and test sets, a model can exploit those signatures and appear to generalise better than it does to a new individual. This issue is especially important in multimodal neuroscience datasets, where subject-specific signal characteristics, recording conditions and movement patterns can be learned by flexible models.
 
-This paper describes the participant-independent validation design implemented for the IACKD EEG–kinematic research project. It focuses on validation architecture and reproducibility controls rather than reporting empirical model performance.
+This note expands the validation architecture and reproducibility controls specified in the primary IACKD protocol manuscript. It is retained as supporting technical documentation, not as a separate empirical study or an independent original research submission.
 
 ## 2. Validation target and unit of generalisation
 
@@ -65,7 +65,7 @@ The proposed dataset includes instructed congruent and incongruent mapping condi
 
 ## Conclusion
 
-The completed methods contribution is a participant-independent validation specification supported by an auditable repository structure, inventory utility, unit tests and CI workflow. It makes the participant—not the individual trial—the unit of outer generalisation and explicitly restricts learned preprocessing to training participants. No empirical model results are reported.
+This supplementary note records the participant-independent validation specification, leakage boundaries and supporting software checks associated with the primary protocol manuscript. The participant—not the individual trial—is the outer unit of generalisation, and learned preprocessing is restricted to training participants. No empirical model results are reported. The note should accompany the primary manuscript as supplementary methods rather than be submitted as a second paper based on the same protocol and dataset.
 
 ## Declarations
 
@@ -75,4 +75,4 @@ The completed methods contribution is a participant-independent validation speci
 - **Funding:** To be completed by the author.
 - **Competing interests:** To be completed by the author.
 
-**Manuscript note:** This methods paper is a companion to the project's protocol manuscript. Its focus is participant-independent validation and leakage control. The shared dataset and protocol relationship should be disclosed to editors, and overlapping text should be minimised in any eventual submissions.
+**Relationship to the primary manuscript:** This file is supplementary methods for the project's primary pre-movement EEG–kinematics protocol manuscript. Its validation and leakage-control material overlaps with that protocol's analysis plan. Do not submit it as a separate original research paper unless a genuinely distinct research question, analysis and contribution are added and independently justified.
