@@ -3,6 +3,8 @@ name: IACKD full-data audit and LOPO analysis
 on:
   push:
     branches: ["feat/iackd-novelty-lopo-experiment"]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
