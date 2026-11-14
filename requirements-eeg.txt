@@ -4,3 +4,5 @@ scipy>=1.10
 mne-icalabel>=0.6
 python-picard>=0.7
 pytest>=7.0
+pandas>=2.0
+scikit-learn>=1.3
