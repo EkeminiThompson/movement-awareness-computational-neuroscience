@@ -23,12 +23,19 @@ from scipy.integrate import trapezoid
 from scipy.signal import butter, periodogram, sosfilt
 
 
-def load_mat(path: Path) -> dict[str, Any]:
+def load_mat(path: Path, only_include: list[str] | None = None) -> dict[str, Any]:
     try:
         import mat73
-        return mat73.loadmat(str(path))
+        # The pre-movement MAT also contains a MATLAB table (labels). It is
+        # irrelevant to this audit and unsupported by mat73, so load only the
+        # variables needed here instead of decoding the entire file.
+        return mat73.loadmat(
+            str(path), only_include=only_include, verbose=False
+        )
     except Exception as first_error:
         try:
+            # scipy cannot decode v7.3/HDF5 MAT files, but remains a fallback
+            # for older MAT formats.
             return loadmat(str(path), squeeze_me=True, struct_as_record=False)
         except Exception as second_error:
             raise RuntimeError(
@@ -78,6 +85,14 @@ def text_value(value: Any) -> str:
 
 
 def records(value: Any) -> list[Any]:
+    """Convert MATLAB struct outputs to records without splitting sample vectors.
+
+    mat73 normally returns struct arrays as lists of dictionaries. In some
+    MATLAB v7.3 layouts it returns a dict of field arrays instead. For OUT,
+    the scalar-per-trial eeg_seg_idx field defines the record count; using the
+    longest field (often the number of kinematic samples) would incorrectly
+    split each trial into individual samples.
+    """
     if value is None:
         return []
     if isinstance(value, list):
@@ -85,27 +100,49 @@ def records(value: Any) -> list[Any]:
     if isinstance(value, tuple):
         return list(value)
     if isinstance(value, dict):
-        lengths = []
-        for v in value.values():
-            if isinstance(v, (str, bytes)):
-                continue
+        def as_array(item: Any) -> np.ndarray | None:
+            if isinstance(item, (str, bytes)):
+                return None
             try:
-                if np.asarray(v).ndim > 0:
-                    lengths.append(len(v))
+                return np.asarray(item)
             except Exception:
-                pass
-        n = max(lengths, default=1)
+                return None
+
+        n = None
+        for key in ("eeg_seg_idx", "eeg_seg_index", "lm_trial"):
+            if key in value:
+                arr = as_array(value[key])
+                if arr is not None:
+                    n = 1 if arr.ndim == 0 else int(arr.size)
+                    if n > 0:
+                        break
+
+        if n is None:
+            lengths = []
+            for item in value.values():
+                arr = as_array(item)
+                if arr is not None and arr.ndim > 0:
+                    lengths.append(int(arr.shape[0]))
+            n = max(lengths, default=1)
+
         out = []
         for i in range(n):
             row = {}
-            for k, v in value.items():
-                try:
-                    arr = np.asarray(v)
-                    row[k] = arr[i] if arr.ndim > 0 and len(arr) == n else v
-                except Exception:
-                    row[k] = v
+            for key, item in value.items():
+                arr = as_array(item)
+                if arr is None or arr.ndim == 0:
+                    row[key] = item
+                elif n == 1:
+                    row[key] = item
+                elif arr.shape[0] == n:
+                    row[key] = arr[i]
+                elif arr.ndim > 1 and arr.shape[-1] == n:
+                    row[key] = arr[..., i]
+                else:
+                    row[key] = item
             out.append(row)
         return out
+
     arr = np.asarray(value)
     if arr.ndim == 0:
         return [arr.item()]
@@ -126,14 +163,14 @@ def normalise_label(value: Any) -> str:
 
 
 def read_out_records(path: Path) -> list[Any]:
-    mat = load_mat(path)
+    mat = load_mat(path, only_include=["OUT"])
     if "OUT" not in mat:
         raise KeyError(f"{path} has no OUT variable")
     return records(mat["OUT"])
 
 
 def read_trial_info(path: Path) -> tuple[list[Any], float]:
-    mat = load_mat(path)
+    mat = load_mat(path, only_include=["trial_info", "meta", "RESAMPLE_HZ", "srate"])
     info = records(mat.get("trial_info"))
     # The released pre-movement derivatives save the sampling rate as
     # meta.srate (not a top-level RESAMPLE_HZ/srate variable).
@@ -315,7 +352,19 @@ def extract_kinematics(out_record: Any) -> dict[str, float]:
     y = vector(field(out_record, "y_mm"))
     z = vector(field(out_record, "z_mm"))
     if t.size == 0 or x.size != t.size or y.size != t.size or z.size != t.size:
-        raise ValueError("OUT record has incompatible t_ms/x_mm/y_mm/z_mm arrays")
+        def shape(value: Any) -> str:
+            try:
+                arr = np.asarray(value)
+                return f"{type(value).__name__}{arr.shape}/{arr.dtype}"
+            except Exception:
+                return type(value).__name__
+        details = ", ".join(
+            f"{name}={shape(field(out_record, name))}"
+            for name in ("t_ms", "x_mm", "y_mm", "z_mm")
+        )
+        raise ValueError(
+            "OUT record has incompatible t_ms/x_mm/y_mm/z_mm arrays: " + details
+        )
     good = (
         np.isfinite(t) & np.isfinite(x) & np.isfinite(y) & np.isfinite(z) & (t >= 0)
     )
