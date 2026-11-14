@@ -106,7 +106,7 @@ Outputs: `metrics.json`, `lopo_predictions.csv`, `participant_fold_metrics.csv`,
 **Important:** the CSV must be generated from an audited, version-pinned IACKD release. This runner does not load raw MATLAB files, establish EEG–kinematic correspondence, or prove that upstream EEG features are leakage-free. Do not run it on synthetic data and label the output as a dataset result. Do not commit raw participant recordings.
 
 
-## Ethics approvals and participant consent (IACKD source dataset)
+## EthicsApprovals: source article approval and participant consent
 
 The original IACKD data descriptor explicitly states that the study was approved by the **Ethics Committee of the First Hospital of Qinhuangdao (Approval No. 2024G006)**. The committee approved the experimental protocol and anonymized public sharing of the dataset. The article also states that **written informed consent was obtained from all participants before data collection**, including permission for anonymized data storage, sharing, and open public release. The released data were de-identified. These statements describe the original dataset study; they do not constitute ethics approval for this repository's separate secondary analysis.
 
