@@ -9,7 +9,7 @@ try:
     import scipy  # noqa: F401
     import mne  # noqa: F401
     from scripts.audit_and_extract_iackd import (
-        causal_filter, eeg_features, event_rows, extract_kinematics,
+        causal_filter, eeg_features, event_rows, extract_kinematics, records,
         map_out_index_to_trial_info,
     )
     RAW_AUDIT_DEPENDENCIES_AVAILABLE = True
@@ -60,6 +60,37 @@ class TestIackdRawAudit(unittest.TestCase):
         self.assertTrue(features)
         self.assertTrue(all(k.startswith("eeg_") for k in features))
         self.assertTrue(all(np.isfinite(v) for v in features.values()))
+
+    def test_matlab_struct_dict_keeps_per_trial_kinematic_sample_vectors(self):
+        # mat73 can expose a MATLAB struct array as a dict of field arrays.
+        # The trial index gives the record count; sample vectors must not be
+        # mistaken for additional trial records.
+        payload = {
+            "eeg_seg_idx": np.array([3, 7]),
+            "lm_trial": np.array([11, 12]),
+            "t_ms": np.tile(np.array([-10, 0, 10, 20, 30, 40]), (2, 1)),
+            "x_mm": np.array([[0, 0, 1, 2, 2, 3], [0, 1, 2, 3, 4, 5]]),
+            "y_mm": np.zeros((2, 6)),
+            "z_mm": np.zeros((2, 6)),
+        }
+        result = records(payload)
+        self.assertEqual(len(result), 2)
+        self.assertEqual(np.asarray(result[0]["t_ms"]).size, 6)
+        self.assertEqual(np.asarray(result[1]["x_mm"]).size, 6)
+        self.assertEqual(float(result[0]["eeg_seg_idx"]), 3.0)
+
+    def test_matlab_struct_dict_handles_transposed_trial_axis(self):
+        payload = {
+            "eeg_seg_idx": np.array([3, 7]),
+            "t_ms": np.tile(np.array([-10, 0, 10, 20, 30, 40])[:, None], (1, 2)),
+            "x_mm": np.tile(np.arange(6)[:, None], (1, 2)),
+            "y_mm": np.zeros((6, 2)),
+            "z_mm": np.zeros((6, 2)),
+        }
+        result = records(payload)
+        self.assertEqual(len(result), 2)
+        self.assertEqual(np.asarray(result[0]["t_ms"]).size, 6)
+        self.assertEqual(np.asarray(result[1]["x_mm"]).size, 6)
 
     def test_kinematic_outcomes_from_aligned_matlab_arrays(self):
         out = {
