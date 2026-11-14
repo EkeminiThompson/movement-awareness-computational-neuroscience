@@ -3,24 +3,26 @@ import unittest
 from pathlib import Path
 
 import numpy as np
-import pytest
 
-# The lightweight legacy CI job may not install optional analysis dependencies.
-# The dedicated LOPO workflow installs requirements-analysis.txt and runs this module.
-pd = pytest.importorskip("pandas")
-pytest.importorskip("sklearn")
-
-from scripts.run_lopo_experiment import run_lopo, validate_table
+try:
+    import pandas as pd
+    import sklearn  # noqa: F401
+    from scripts.run_lopo_experiment import run_lopo, validate_table
+    ANALYSIS_DEPENDENCIES_AVAILABLE = True
+except ImportError:
+    pd = None
+    ANALYSIS_DEPENDENCIES_AVAILABLE = False
 
 
 def make_fixture(seed=12):
+    if not ANALYSIS_DEPENDENCIES_AVAILABLE:
+        raise RuntimeError("Install requirements-analysis.txt to run this fixture.")
     rng = np.random.default_rng(seed)
     rows = []
     for p in range(6):
         for c, condition in enumerate(("congruent", "incongruent")):
             for t in range(8):
                 signal = rng.normal()
-                # Shared signal-outcome relation; modest condition shift for test coverage.
                 target = 300 + 15 * signal + 8 * c + rng.normal(0, 3)
                 rows.append({
                     "participant_id": f"sub-{p:02d}",
@@ -33,6 +35,10 @@ def make_fixture(seed=12):
     return pd.DataFrame(rows)
 
 
+@unittest.skipUnless(
+    ANALYSIS_DEPENDENCIES_AVAILABLE,
+    "Install requirements-analysis.txt; the dedicated LOPO workflow does this.",
+)
 class TestLopoExperiment(unittest.TestCase):
     def test_lopo_runner_outputs_predictions_and_condition_scores(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -47,8 +53,7 @@ class TestLopoExperiment(unittest.TestCase):
                 self.assertEqual(set(group["participant_id"]), {held_out})
 
     def test_only_eeg_prefixed_columns_are_selected(self):
-        frame = make_fixture()
-        features = validate_table(frame, "movement_duration_ms")
+        features = validate_table(make_fixture(), "movement_duration_ms")
         self.assertEqual(features, ["eeg_c3_mu", "eeg_cz_beta"])
         self.assertNotIn("condition", features)
 
