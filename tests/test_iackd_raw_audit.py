@@ -79,6 +79,32 @@ class TestIackdRawAudit(unittest.TestCase):
         self.assertEqual(np.asarray(result[1]["x_mm"]).size, 6)
         self.assertEqual(float(result[0]["eeg_seg_idx"]), 3.0)
 
+    def test_matlab_struct_dict_splits_ragged_cell_sample_arrays(self):
+        payload = {
+            "eeg_seg_idx": np.array([3, 7]),
+            "t_ms": [
+                np.array([-10, 0, 10, 20, 30, 40]),
+                np.array([-10, 0, 10, 20, 30, 40, 50]),
+            ],
+            "x_mm": [
+                np.array([0, 0, 1, 2, 2, 3]),
+                np.array([0, 1, 2, 3, 4, 5, 6]),
+            ],
+            "y_mm": [
+                np.zeros(6),
+                np.zeros(7),
+            ],
+            "z_mm": [
+                np.zeros(6),
+                np.zeros(7),
+            ],
+        }
+        result = records(payload)
+        self.assertEqual(len(result), 2)
+        self.assertEqual(np.asarray(result[0]["t_ms"]).size, 6)
+        self.assertEqual(np.asarray(result[1]["t_ms"]).size, 7)
+        self.assertEqual(np.asarray(result[1]["x_mm"]).size, 7)
+
     def test_matlab_struct_dict_handles_transposed_trial_axis(self):
         payload = {
             "eeg_seg_idx": np.array([3, 7]),
