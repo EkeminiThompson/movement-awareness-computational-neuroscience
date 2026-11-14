@@ -584,16 +584,34 @@ def main() -> None:
     all_rows: list[dict] = []
     run_reports: list[dict] = []
     errors: list[dict] = []
-    expected_run_count = sum(
+    missing_runs: list[dict] = []
+    expected_run_slots = sum(
         2 * (6 if participant in {"sub-04", "sub-05"} else 4)
         for participant in args.participants
     )
+    expected_run_count = 0
     for participant in args.participants:
         for hand in ("L", "R"):
             # The released BIDS dataset has six runs per hand for sub-04
             # and sub-05, and four runs per hand for the other participants.
             n_runs = 6 if participant in {"sub-04", "sub-05"} else 4
             for run in range(1, n_runs + 1):
+                run_id = f"{run:02d}"
+                pre_path = (
+                    dataset / "derivatives" / "pre-movement" / participant / "ihc"
+                    / f"{participant}_task-ihc_run-{run_id}_pre_eeg_{hand}{run}.mat"
+                )
+                if not pre_path.exists():
+                    # One pre-movement derivative (sub-04, right hand, run 6)
+                    # is absent from the pinned v1.0.0 manifest. Record this
+                    # as a dataset-availability gap, not as a failed read.
+                    missing_runs.append({
+                        "participant_id": participant, "hand": hand, "run": run,
+                        "missing_file": str(pre_path.relative_to(dataset)),
+                        "reason": "pre-movement MATLAB derivative absent from release",
+                    })
+                    continue
+                expected_run_count += 1
                 try:
                     rows, report = process_run(
                         dataset, participant, hand, run,
@@ -611,6 +629,7 @@ def main() -> None:
         output.mkdir(parents=True, exist_ok=True)
         pd.DataFrame(run_reports).to_csv(output / 'run_audit.csv', index=False)
         (output / 'audit_errors.json').write_text(json.dumps(errors, indent=2), encoding='utf-8')
+        (output / 'missing_runs.json').write_text(json.dumps(missing_runs, indent=2), encoding='utf-8')
         first_errors = errors[:12]
         raise RuntimeError(
             'No trial rows were extracted. First run errors: ' +
@@ -620,6 +639,16 @@ def main() -> None:
     table.to_csv(output / "all_matched_trials_pre_qc.csv", index=False)
     pd.DataFrame(run_reports).to_csv(output / "run_audit.csv", index=False)
     (output / "audit_errors.json").write_text(json.dumps(errors, indent=2), encoding="utf-8")
+    (output / "missing_runs.json").write_text(json.dumps(missing_runs, indent=2), encoding="utf-8")
+
+    # Do not silently proceed to model fitting when any available run failed
+    # to parse or reconcile. The missing derivative above is explicitly
+    # accounted for and does not count as a processing failure.
+    if errors or len(run_reports) != expected_run_count:
+        raise RuntimeError(
+            f"Run audit incomplete: {len(run_reports)}/{expected_run_count} available runs audited; "
+            f"{len(errors)} processing errors. See audit_errors.json and missing_runs.json."
+        )
 
     qc = table.loc[table.passed_all_qc].copy()
     # Require both conditions and all 15 participants before the confirmatory model.
@@ -632,7 +661,10 @@ def main() -> None:
         "participants_expected": 15,
         "participants_with_qc_trials": len(participant_counts),
         "participant_trial_counts": participant_counts,
-        "n_run_attempts": expected_run_count,
+        "n_run_slots_expected": expected_run_slots,
+        "n_available_runs_expected": expected_run_count,
+        "n_missing_premove_derivative_runs": len(missing_runs),
+        "missing_premove_derivative_runs": missing_runs,
         "n_runs_successfully_audited": len(run_reports),
         "n_run_errors": len(errors),
         "n_out_records_extracted": int(len(table)),
