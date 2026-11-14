@@ -1,0 +1,49 @@
+# IACKD raw-data acquisition and confirmatory analysis
+
+## Dataset acquisition
+
+The target is NEMAR IACKD accession `on006840`, corresponding to OpenNeuro `ds006840`, release v1.0.0. NEMAR lists 15 participants, approximately 7.42 GB and a CC0 license. The full download must include both `sourcedata/` and `derivatives/`; the default NEMAR download skips large `derivatives/` and `stimuli/` trees.
+
+Install Bun, DataLad and git-annex, then run:
+
+```bash
+bash scripts/download_iackd.sh data
+```
+
+The acquisition command is `nemar dataset download on006840 --stimuli --derivatives`. Keep the downloaded data outside Git. Never commit raw EEG or participant recordings to this repository.
+
+## Why the supplied pre-movement EEG derivative is not the predictor
+
+The data descriptor reports that the pre-movement EEG was downsampled to 200 Hz and filtered 0.1–45 Hz using a zero-phase FIR filter. A zero-phase filter can allow samples after movement onset to influence samples before onset. The supplied `segs_1s` is therefore not assumed to be leakage-safe.
+
+The extractor reads the raw BrainVision EEG, applies a one-pass causal 0.1–45 Hz Butterworth filter to the continuous recording, average-references instantaneously, and extracts only the premove interval ending at the event-14 / execution-onset boundary. The supplied premove MATLAB file is used only for trial metadata/index reconciliation, not as an EEG predictor. This avoids post-onset signal leakage into the predictors. No ICA model is fitted on the held-out participant.
+
+## Trial reconciliation
+
+For each participant, hand and run, the script requires:
+- BIDS `*_events.tsv` with premove, execution and hit rows;
+- raw BrainVision `*_eeg.vhdr` plus its data file;
+- `derivatives/premove/.../pre_eeg_L*.mat` or `pre_eeg_R*.mat`;
+- `derivatives/aligned/.../eeg_leap_L*.mat` or `eeg_leap_R*.mat`.
+
+The MATLAB `OUT` record's EEG segment index is resolved against `trial_info`, then checked against the BIDS event-14 time. Premove end must agree with execution onset, and execution end must agree with hit onset within 50 ms. A trial cannot be silently matched by filename or row order alone. Duplicate event matches fail the run.
+
+Kinematic outcomes are calculated from the aligned MATLAB `OUT` arrays: movement duration, planar path length and peak planar speed. Alignment QC uses the predeclared coverage threshold (0.75) and absolute start residual threshold (30 ms). All excluded trials remain represented in `all_matched_trials_pre_qc.csv` and the run audit.
+
+## Run locally
+
+```bash
+python -m pip install -r requirements-iackd-analysis.txt
+python scripts/audit_and_extract_iackd.py --dataset data/on006840 --output-dir reports/iackd
+python scripts/run_lopo_experiment.py --input-csv reports/iackd/audited_eeg_kinematics_features.csv --target movement_duration_ms --output-dir reports/iackd/lopo_duration
+python scripts/run_lopo_experiment.py --input-csv reports/iackd/audited_eeg_kinematics_features.csv --target path_length_mm --output-dir reports/iackd/lopo_path_length
+python scripts/run_lopo_experiment.py --input-csv reports/iackd/audited_eeg_kinematics_features.csv --target peak_speed_mm_s --output-dir reports/iackd/lopo_peak_speed
+```
+
+The GitHub Actions workflow performs the same full-data process and uploads the reports as an artifact. It can take several hours and may hit runner disk or download limits.
+
+## Interpretation and reporting boundary
+
+The workflow must stop if any of the 15 participants is missing, event matching is ambiguous, the raw EEG interval cannot be verified, or either condition is absent. A successful run produces three LOPO experiments, each with 15 outer folds. Scaling and Ridge tuning remain inside grouped training-participant folds. Condition-specific scores and participant-level bootstrap intervals are reported.
+
+The 6,671 valid-trial figure in the 2026 data descriptor and the 6,720 figure in the original project README are reference counts, not acceptance targets to force. The file-level audit determines the observed counts. Never claim that the discrepancy is resolved until the inventory and exclusions explain it.
