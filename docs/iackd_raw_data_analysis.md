@@ -30,7 +30,7 @@ For each participant, hand and run, the script requires:
 
 The MATLAB `OUT` record's EEG segment index is resolved against `trial_info`, then checked against the BIDS event-14 time. Premove end must agree with execution onset, and execution end must agree with hit onset within 50 ms. A trial cannot be silently matched by filename or row order alone. Duplicate event matches fail the run.
 
-Kinematic outcomes are calculated from the aligned MATLAB `OUT` arrays: movement duration, planar path length and peak planar speed. Alignment QC uses the predeclared coverage threshold (0.75) and absolute start residual threshold (30 ms). All excluded trials remain represented in `all_matched_trials_pre_qc.csv` and the run audit.
+Kinematic outcomes are calculated from the aligned MATLAB `OUT` arrays: movement duration, 3-D path length and peak 3-D speed using `x_mm`, `y_mm` and `z_mm`. The dataset-provided aligned coordinates are 4-Hz zero-phase-smoothed; this affects the kinematic target definition, not the pre-movement EEG predictor. A raw Leap-stream sensitivity analysis should be added before final journal submission. Alignment QC uses the predeclared coverage threshold (0.75) and absolute start residual threshold (30 ms). All excluded trials remain represented in `all_matched_trials_pre_qc.csv` and the run audit.
 
 ## Run locally
 
