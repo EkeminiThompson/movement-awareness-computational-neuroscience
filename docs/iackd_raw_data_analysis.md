@@ -4,13 +4,15 @@
 
 The target is NEMAR IACKD accession `on006840`, corresponding to OpenNeuro `ds006840`, release v1.0.0. NEMAR lists 15 participants, approximately 7.42 GB and a CC0 license. The full download must include both `sourcedata/` and `derivatives/`; the default NEMAR download skips large `derivatives/` and `stimuli/` trees.
 
-Install Bun, DataLad and git-annex, then run:
+The NEMAR data plane exposes a version-pinned manifest and stable file URLs. The repository downloader fetches `https://data.nemar.org/on006840/v1.0.0/manifest.json`, downloads every manifest entry (including raw EEG, sourcedata and derivatives), resumes interrupted transfers, and verifies each file using the manifest's SHA-256, MD5 or Git-blob checksum.
+
+Run:
 
 ```bash
-bash scripts/download_iackd.sh data
+bash scripts/download_iackd.sh data/on006840
 ```
 
-The acquisition command is `nemar dataset download on006840 --stimuli --derivatives`. Keep the downloaded data outside Git. Never commit raw EEG or participant recordings to this repository.
+No NEMAR account, CLI, DataLad or git-annex installation is required for this public release. Keep the downloaded data outside Git. Never commit raw EEG or participant recordings to this repository.
 
 ## Why the supplied pre-movement EEG derivative is not the predictor
 
@@ -40,7 +42,7 @@ python scripts/run_lopo_experiment.py --input-csv reports/iackd/audited_eeg_kine
 python scripts/run_lopo_experiment.py --input-csv reports/iackd/audited_eeg_kinematics_features.csv --target peak_speed_mm_s --output-dir reports/iackd/lopo_peak_speed
 ```
 
-The GitHub Actions workflow performs the same full-data process and uploads the reports as an artifact. It can take several hours and may hit runner disk or download limits.
+The GitHub Actions workflow uses the same version-pinned manifest downloader and uploads the reports as an artifact. It can take several hours and may hit runner disk or download limits. The first CLI-based attempt failed during git-annex remote initialisation; the current workflow uses the documented direct data-plane manifest instead.
 
 ## Interpretation and reporting boundary
 
