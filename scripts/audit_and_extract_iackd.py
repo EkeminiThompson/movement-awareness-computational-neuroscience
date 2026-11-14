@@ -356,10 +356,11 @@ def process_run(dataset: Path, participant: str, hand: str, run: int,
                     f"Condition mismatch for {participant} {hand}{run} trial {event_i}: "
                     f"OUT ball_color={color}, events.tsv={condition}"
                 )
-        passed = (
+        alignment_qc_pass = bool(
             np.isfinite(cov) and cov >= min_cov and
-            np.isfinite(residual) and abs(residual) <= max_start_res_ms and eeg_qc_pass
+            np.isfinite(residual) and abs(residual) <= max_start_res_ms
         )
+        passed = bool(alignment_qc_pass and eeg_qc_pass)
         row = {
             "participant_id": participant,
             "trial_id": f"{participant}_{hand}{run:02d}_{event_i:04d}",
@@ -374,8 +375,9 @@ def process_run(dataset: Path, participant: str, hand: str, run: int,
             "leap_trial_index": lm_idx,
             "start_res_ms": residual,
             "coverage": cov,
-            "passed_alignment_qc": bool(passed),
+            "passed_alignment_qc": alignment_qc_pass,
             "passed_eeg_qc": eeg_qc_pass,
+            "passed_all_qc": passed,
             "qc_peak_abs_eeg_uv": peak_abs_uv,
             "raw_eeg_sampling_hz": fs,
             "causal_filter": "4th-order Butterworth 0.1-45 Hz, one-pass SOS; average reference",
@@ -390,6 +392,8 @@ def process_run(dataset: Path, participant: str, hand: str, run: int,
         "n_aligned_OUT": int(len(out_records)), "n_matched": int(len(matched_event_indices)),
         "n_alignment_qc_pass": int(sum(r["passed_alignment_qc"] for r in rows)),
         "n_alignment_qc_fail": int(sum(not r["passed_alignment_qc"] for r in rows)),
+        "n_combined_qc_pass": int(sum(r["passed_all_qc"] for r in rows)),
+        "n_combined_qc_fail": int(sum(not r["passed_all_qc"] for r in rows)),
         "n_eeg_amplitude_qc_pass": int(sum(r["passed_eeg_qc"] for r in rows)),
         "n_eeg_amplitude_qc_fail": int(sum(not r["passed_eeg_qc"] for r in rows)),
         "n_event_rows_unmatched": int(len(events) - len(matched_event_indices)),
@@ -450,7 +454,7 @@ def main() -> None:
     pd.DataFrame(run_reports).to_csv(output / "run_audit.csv", index=False)
     (output / "audit_errors.json").write_text(json.dumps(errors, indent=2), encoding="utf-8")
 
-    qc = table.loc[table.passed_alignment_qc].copy()
+    qc = table.loc[table.passed_all_qc].copy()
     # Require both conditions and all 15 participants before the confirmatory model.
     participant_counts = qc.groupby("participant_id").size().to_dict()
     conditions = sorted(qc.condition.dropna().unique().tolist())
