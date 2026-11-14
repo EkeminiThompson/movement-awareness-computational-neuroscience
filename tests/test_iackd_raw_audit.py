@@ -33,7 +33,7 @@ class TestIackdRawAudit(unittest.TestCase):
             {"onset": 2.6, "duration": 0.0, "trial_type": "hit", "hand": "left",
              "congruency": "congruent", "direction": "right", "ball_color": "red"},
         ])
-        with self.assertRaisesRegex(ValueError, "Premove end"):
+        with self.assertRaisesRegex(ValueError, "No premove events"):
             event_rows(frame)
 
     def test_causal_filter_has_no_future_to_past_leakage(self):
@@ -74,6 +74,35 @@ class TestIackdRawAudit(unittest.TestCase):
         self.assertEqual(info_i, 1)
         self.assertEqual(event_i, 1)
         self.assertAlmostEqual(error, 0.0)
+
+    def test_zero_duration_execution_uses_hit_event_fallback(self):
+        frame = pd.DataFrame([
+            {"onset": 1.0, "duration": 1.0, "trial_type": "premove", "hand": "left",
+             "congruency": "incongruent", "direction": "right", "ball_color": "yellow"},
+            {"onset": 2.0, "duration": 0.0, "trial_type": "execution", "hand": "left",
+             "congruency": "incongruent", "direction": "right", "ball_color": "yellow"},
+            {"onset": 8.2, "duration": 0.0, "trial_type": "hit", "hand": "left",
+             "congruency": "incongruent", "direction": "right", "ball_color": "yellow"},
+        ])
+        result = event_rows(frame)
+        self.assertEqual(result.iloc[0].event_duration_source,
+                         "hit_onset_minus_execution_onset_fallback")
+        self.assertAlmostEqual(result.iloc[0].event_execution_duration_ms, 6200.0)
+
+    def test_orphan_execution_is_audited_not_mispaired(self):
+        frame = pd.DataFrame([
+            {"onset": 1.0, "duration": 1.0, "trial_type": "premove", "hand": "left",
+             "congruency": "congruent", "direction": "right", "ball_color": "red"},
+            {"onset": 2.0, "duration": 0.5, "trial_type": "execution", "hand": "left",
+             "congruency": "congruent", "direction": "right", "ball_color": "red"},
+            {"onset": 2.5, "duration": 0.0, "trial_type": "hit", "hand": "left",
+             "congruency": "congruent", "direction": "right", "ball_color": "red"},
+            {"onset": 9.0, "duration": 0.0, "trial_type": "execution", "hand": "left",
+             "congruency": "incongruent", "direction": "left", "ball_color": "yellow"},
+        ])
+        result = event_rows(frame)
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result.attrs["event_audit"]["n_execution_unmatched"], 1)
 
 
 if __name__ == "__main__":
