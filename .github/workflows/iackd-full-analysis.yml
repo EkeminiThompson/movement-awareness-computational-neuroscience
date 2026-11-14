@@ -21,29 +21,16 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-      - name: Install DataLad and git-annex
+      - name: Download and checksum-verify complete IACKD v1.0.0 from NEMAR manifest
         run: |
-          sudo apt-get update
-          sudo apt-get install -y git-annex
-          python -m pip install --upgrade pip datalad
-      - name: Install NEMAR CLI
-        run: bun install -g nemar-cli
-      - name: Download complete IACKD v1.0.0
-        run: |
-          mkdir -p data
-          cd data
-          nemar dataset download on006840 --stimuli --derivatives
-          cd on006840
+          python scripts/download_iackd_manifest.py --dataset-id on006840 --version v1.0.0 --output-dir data/on006840 --max-workers 4
           python - <<'PY'
           import json
           from pathlib import Path
-          d=json.loads(Path("dataset_description.json").read_text())
+          d=json.loads(Path("data/on006840/dataset_description.json").read_text())
           print(json.dumps(d, indent=2))
-          if d.get("DatasetVersion") not in ("1.0.0", "v1.0.0", None):
-              raise SystemExit("Unexpected IACKD version; stop and inspect provenance.")
+          if d.get("DatasetDOI") not in ("doi:10.18112/openneuro.ds006840.v1.0.0", "10.18112/openneuro.ds006840.v1.0.0"):
+              raise SystemExit("Unexpected IACKD source DOI; stop and inspect provenance.")
           PY
       - name: Install analysis dependencies
         run: python -m pip install -r requirements-iackd-analysis.txt
