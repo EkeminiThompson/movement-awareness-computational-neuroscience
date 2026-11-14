@@ -11,8 +11,8 @@ import pandas as pd
 
 TARGETS = {
     "lopo_duration": ("Movement duration", "ms"),
-    "lopo_path_length": ("Planar path length", "mm"),
-    "lopo_peak_speed": ("Peak planar speed", "mm/s"),
+    "lopo_path_length": ("3-D path length", "mm"),
+    "lopo_peak_speed": ("Peak 3-D speed", "mm/s"),
 }
 
 
