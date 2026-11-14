@@ -1,21 +1,23 @@
 import unittest
 
 import numpy as np
-import pytest
 
-# The legacy protocol workflow installs only NumPy and pytest. The dedicated
-# IACKD workflow installs the full analysis stack and executes these tests.
-pytest.importorskip("pandas")
-pytest.importorskip("scipy")
-pytest.importorskip("mne")
-import pandas as pd
+# The legacy protocol workflow installs only NumPy and pytest. Keep unittest
+# discovery importable there; the dedicated IACKD workflow installs all extras.
+try:
+    import pandas as pd
+    import scipy  # noqa: F401
+    import mne  # noqa: F401
+    from scripts.audit_and_extract_iackd import (
+        causal_filter, eeg_features, event_rows, extract_kinematics,
+        map_out_index_to_trial_info,
+    )
+    RAW_AUDIT_DEPENDENCIES_AVAILABLE = True
+except ImportError:
+    pd = None
+    RAW_AUDIT_DEPENDENCIES_AVAILABLE = False
 
-from scripts.audit_and_extract_iackd import (
-    causal_filter, eeg_features, event_rows, extract_kinematics,
-    map_out_index_to_trial_info,
-)
-
-
+@unittest.skipUnless(RAW_AUDIT_DEPENDENCIES_AVAILABLE, 'Install requirements-iackd-analysis.txt')
 class TestIackdRawAudit(unittest.TestCase):
     def test_event_rows_reconcile_premove_execution_hit(self):
         frame = pd.DataFrame([
