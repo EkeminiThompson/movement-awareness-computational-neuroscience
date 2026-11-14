@@ -1,6 +1,13 @@
 import unittest
 
 import numpy as np
+import pytest
+
+# The legacy protocol workflow installs only NumPy and pytest. The dedicated
+# IACKD workflow installs the full analysis stack and executes these tests.
+pytest.importorskip("pandas")
+pytest.importorskip("scipy")
+pytest.importorskip("mne")
 import pandas as pd
 
 from scripts.audit_and_extract_iackd import (
