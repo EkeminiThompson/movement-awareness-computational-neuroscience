@@ -18,6 +18,9 @@ jobs:
       - uses: actions/checkout@v4
       - name: Check available disk
         run: df -h
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
