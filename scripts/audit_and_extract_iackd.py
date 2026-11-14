@@ -341,6 +341,8 @@ def process_run(dataset: Path, participant: str, hand: str, run: int,
         feat = eeg_features(epoch, fs, channel_names)
 
         kin = extract_kinematics(out_rec)
+        peak_abs_uv = float(np.max(np.abs(epoch)))
+        eeg_qc_pass = bool(peak_abs_uv <= 300.0)
         cov = scalar(field(out_rec, "cov"), default=np.nan)
         residual = scalar(field(out_rec, "start_res_ms"), default=np.nan)
         eeg_idx = scalar(field(out_rec, "eeg_seg_index", "eeg_seg_idx"))
@@ -356,7 +358,7 @@ def process_run(dataset: Path, participant: str, hand: str, run: int,
                 )
         passed = (
             np.isfinite(cov) and cov >= min_cov and
-            np.isfinite(residual) and abs(residual) <= max_start_res_ms
+            np.isfinite(residual) and abs(residual) <= max_start_res_ms and eeg_qc_pass
         )
         row = {
             "participant_id": participant,
@@ -373,6 +375,8 @@ def process_run(dataset: Path, participant: str, hand: str, run: int,
             "start_res_ms": residual,
             "coverage": cov,
             "passed_alignment_qc": bool(passed),
+            "passed_eeg_qc": eeg_qc_pass,
+            "qc_peak_abs_eeg_uv": peak_abs_uv,
             "raw_eeg_sampling_hz": fs,
             "causal_filter": "4th-order Butterworth 0.1-45 Hz, one-pass SOS; average reference",
             **kin,
@@ -386,6 +390,8 @@ def process_run(dataset: Path, participant: str, hand: str, run: int,
         "n_aligned_OUT": int(len(out_records)), "n_matched": int(len(matched_event_indices)),
         "n_alignment_qc_pass": int(sum(r["passed_alignment_qc"] for r in rows)),
         "n_alignment_qc_fail": int(sum(not r["passed_alignment_qc"] for r in rows)),
+        "n_eeg_amplitude_qc_pass": int(sum(r["passed_eeg_qc"] for r in rows)),
+        "n_eeg_amplitude_qc_fail": int(sum(not r["passed_eeg_qc"] for r in rows)),
         "n_event_rows_unmatched": int(len(events) - len(matched_event_indices)),
         "raw_eeg_fs_hz": fs, "n_eeg_channels": len(channel_names),
         "event_file": str(event_path.relative_to(dataset)),
@@ -477,6 +483,11 @@ def main() -> None:
         "errors": errors,
     }
     (output / "audit_summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
+    if errors or len(run_reports) != len(args.participants) * 8:
+        raise RuntimeError(
+            f"Only {len(run_reports)}/{len(args.participants) * 8} expected participant-hand-runs passed the audit; "
+            "inspect audit_errors.json and resolve missing/failed runs before modelling."
+        )
     if len(participant_counts) != 15:
         raise RuntimeError(
             f"Only {len(participant_counts)}/15 participants have QC-passing trials; "
