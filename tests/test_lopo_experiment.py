@@ -3,7 +3,12 @@ import unittest
 from pathlib import Path
 
 import numpy as np
-import pandas as pd
+import pytest
+
+# The lightweight legacy CI job may not install optional analysis dependencies.
+# The dedicated LOPO workflow installs requirements-analysis.txt and runs this module.
+pd = pytest.importorskip("pandas")
+pytest.importorskip("sklearn")
 
 from scripts.run_lopo_experiment import run_lopo, validate_table
 
