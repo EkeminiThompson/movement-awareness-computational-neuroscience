@@ -1,0 +1,8 @@
+cff-version: 1.2.0
+message: "If you use this software or protocol, please cite it as follows."
+title: "Pre-movement EEG and Subsequent Action Kinematics: A Participant-Independent Modelling Protocol with Data Audit and Outcome Baselines"
+authors:
+  - family-names: Thompson
+    given-names: Ekemini
+    affiliation: "Nnamdi Azikiwe University, Awka, Nigeria"
+type: software

@@ -1,0 +1,6 @@
+# Do not commit raw participant recordings or generated result files.
+data/on006840/
+reports/iackd/
+__pycache__/
+.pytest_cache/
+*.py[cod]

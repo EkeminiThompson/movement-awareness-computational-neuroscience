@@ -73,3 +73,41 @@ The repository is a computational work sample, not a substitute for the host gro
 ## Citation
 
 Cite the OpenNeuro dataset and its data descriptor in any resulting work. Confirm the final metadata and citation format before manuscript submission.
+
+
+## Novelty and executable experiment
+
+The study does **not** claim that pre-movement EEG decoding, continuous kinematic prediction, or leave-one-participant-out validation is new in isolation. Prior work overlaps with these elements. The defensible proposed contribution is a condition-sensitive participant-held-out evaluation of continuous movement execution outcomes in IACKD, coupled to explicit temporal-leakage controls and participant-level uncertainty. See [the novelty and experiment specification](docs/novelty_and_experiment.md).
+
+### Run the LOPO regression after the data audit
+
+Prepare one CSV row per verified EEG–kinematic matched trial. Required columns:
+
+- `participant_id`: participant identifier;
+- `trial_id`: unique trial identifier within participant;
+- `condition`: verified mapping condition (for example, congruent/incongruent);
+- `movement_duration_ms`: primary target (or another predeclared target);
+- one or more EEG-only numeric predictors named `eeg_*`.
+
+The script admits only `eeg_*` columns as predictors. It fits scaling and Ridge regularisation inside grouped training folds, holds out each participant in turn, compares with the training-mean baseline, and reports condition-stratified error and participant-level bootstrap intervals.
+
+Install analysis dependencies and run:
+
+```bash
+python -m pip install -r requirements-analysis.txt
+python scripts/run_lopo_experiment.py \
+  --input-csv reports/derived_trial_features.csv \
+  --target movement_duration_ms \
+  --output-dir reports/lopo_duration
+```
+
+Outputs: `metrics.json`, `lopo_predictions.csv`, `participant_fold_metrics.csv`, `condition_metrics.csv`, and `condition_participant_metrics.csv`.
+
+**Important:** the CSV must be generated from an audited, version-pinned IACKD release. This runner does not load raw MATLAB files, establish EEG–kinematic correspondence, or prove that upstream EEG features are leakage-free. Do not run it on synthetic data and label the output as a dataset result. Do not commit raw participant recordings.
+
+
+## EthicsApprovals: source article approval and participant consent
+
+The original IACKD data descriptor explicitly states that the study was approved by the **Ethics Committee of the First Hospital of Qinhuangdao (Approval No. 2024G006)**. The committee approved the experimental protocol and anonymized public sharing of the dataset. The article also states that **written informed consent was obtained from all participants before data collection**, including permission for anonymized data storage, sharing, and open public release. The released data were de-identified. These statements describe the original dataset study; they do not constitute ethics approval for this repository's separate secondary analysis.
+
+Source: Cai et al. (2026), *Scientific Data*, 13, 933. https://doi.org/10.1038/s41597-026-07146-x
