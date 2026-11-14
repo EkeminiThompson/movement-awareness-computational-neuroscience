@@ -158,31 +158,103 @@ def event_table(path: Path) -> pd.DataFrame:
 
 
 def event_rows(frame: pd.DataFrame) -> pd.DataFrame:
-    pre = frame.loc[frame.trial_type.astype(str).str.lower() == "premove"].copy()
-    execution = frame.loc[frame.trial_type.astype(str).str.lower() == "execution"].copy()
-    hit = frame.loc[frame.trial_type.astype(str).str.lower() == "hit"].copy()
-    pre = pre.sort_values("onset").reset_index(drop=True)
-    execution = execution.sort_values("onset").reset_index(drop=True)
-    hit = hit.sort_values("onset").reset_index(drop=True)
-    if not (len(pre) == len(execution) == len(hit)):
-        raise ValueError(
-            f"Event row counts differ: premove={len(pre)}, execution={len(execution)}, hit={len(hit)}"
-        )
-    if len(pre) == 0:
-        raise ValueError("No premove trials found in events.tsv")
-    if np.max(np.abs((pre.onset.to_numpy() + pre.duration.to_numpy()) -
-                     execution.onset.to_numpy())) > 0.05:
-        raise ValueError("Premove end and execution onset disagree by >50 ms.")
-    if np.max(np.abs((execution.onset.to_numpy() + execution.duration.to_numpy()) -
-                     hit.onset.to_numpy())) > 0.05:
-        raise ValueError("Execution end and hit onset disagree by >50 ms.")
-    out = pre.copy()
-    out["event14_s"] = pre.onset.to_numpy() + pre.duration.to_numpy()
-    out["event_execution_duration_ms"] = execution.duration.to_numpy() * 1000.0
-    out["hit_onset_s"] = hit.onset.to_numpy()
-    out["trial_order_in_run"] = np.arange(len(out), dtype=int)
-    return out
+    """Match premove -> execution by event-14 time and trial labels, not row position."""
+    pre = frame.loc[frame.trial_type.astype(str).str.lower() == "premove"].sort_values("onset")
+    execution = frame.loc[frame.trial_type.astype(str).str.lower() == "execution"].sort_values("onset")
+    hit = frame.loc[frame.trial_type.astype(str).str.lower() == "hit"].sort_values("onset")
+    used_exec: set[int] = set()
+    used_hit: set[int] = set()
+    matched = []
+    unmatched_premove = 0
+    inconsistent_hit_timing = 0
 
+    def labels(row: pd.Series) -> tuple[str, ...]:
+        return tuple(normalise_label(row.get(k, "")) for k in
+                     ("hand", "congruency", "direction", "ball_color"))
+
+    exec_records = list(execution.iterrows())
+    hit_records = list(hit.iterrows())
+    for _, p in pre.iterrows():
+        event14 = float(p.onset) + float(p.duration)
+        candidates = [
+            (abs(float(e.onset) - event14), pos, e)
+            for pos, (_, e) in enumerate(exec_records)
+            if pos not in used_exec and labels(e) == labels(p)
+            and abs(float(e.onset) - event14) <= 0.05
+        ]
+        if not candidates:
+            unmatched_premove += 1
+            continue
+        candidates.sort(key=lambda x: x[0])
+        if len(candidates) > 1 and abs(candidates[0][0] - candidates[1][0]) < 1e-9:
+            raise ValueError(f"Ambiguous execution event for premove at {p.onset}s")
+        _, exec_pos, e = candidates[0]
+        used_exec.add(exec_pos)
+
+        hit_candidates = [
+            (float(h.onset) - float(e.onset), pos, h)
+            for pos, (_, h) in enumerate(hit_records)
+            if pos not in used_hit and labels(h) == labels(p)
+            and float(h.onset) >= float(e.onset) - 0.05
+        ]
+        hit_onset = np.nan
+        hit_delay_ms = np.nan
+        hit_found = False
+        if hit_candidates:
+            hit_candidates.sort(key=lambda x: x[0])
+            delay, hit_pos, h = hit_candidates[0]
+            if delay <= 7.0:
+                used_hit.add(hit_pos)
+                hit_onset = float(h.onset)
+                hit_delay_ms = delay * 1000.0
+                hit_found = True
+
+        duration_field_ms = float(e.duration) * 1000.0
+        duration_consistent = None
+        if hit_found and duration_field_ms > 0:
+            duration_consistent = abs(duration_field_ms - hit_delay_ms) <= 50.0
+            if not duration_consistent:
+                inconsistent_hit_timing += 1
+        if duration_field_ms > 0:
+            duration_ms = duration_field_ms
+            duration_source = "events_tsv_execution_duration"
+        elif hit_found:
+            duration_ms = hit_delay_ms
+            duration_source = "hit_onset_minus_execution_onset_fallback"
+        else:
+            duration_ms = np.nan
+            duration_source = "unavailable"
+
+        row = p.to_dict()
+        row.update({
+            "event14_s": event14,
+            "event_execution_duration_ms": duration_ms,
+            "event_execution_duration_field_ms": duration_field_ms,
+            "event_duration_source": duration_source,
+            "hit_onset_s": hit_onset,
+            "event_hit_delay_ms": hit_delay_ms,
+            "hit_event_found": hit_found,
+            "event_hit_timing_consistent": duration_consistent,
+            "trial_order_in_run": len(matched),
+        })
+        matched.append(row)
+
+    unmatched_execution = len(exec_records) - len(used_exec)
+    unmatched_hit = len(hit_records) - len(used_hit)
+    if not matched:
+        raise ValueError("No premove events could be matched to execution events by time and labels.")
+    result = pd.DataFrame(matched).sort_values("event14_s").reset_index(drop=True)
+    result.attrs["event_audit"] = {
+        "n_premove_total": int(len(pre)),
+        "n_execution_total": int(len(execution)),
+        "n_hit_total": int(len(hit)),
+        "n_premove_matched_to_execution": int(len(matched)),
+        "n_premove_without_execution": int(unmatched_premove),
+        "n_execution_unmatched": int(unmatched_execution),
+        "n_hit_unmatched": int(unmatched_hit),
+        "n_hit_timing_inconsistent_when_duration_present": int(inconsistent_hit_timing),
+    }
+    return result
 
 def map_out_index_to_trial_info(out_record: Any, info: list[Any], fs: float,
                                 events: pd.DataFrame) -> tuple[int, float, float]:
@@ -389,7 +461,13 @@ def process_run(dataset: Path, participant: str, hand: str, run: int,
 
     report = {
         "participant_id": participant, "hand": hand, "run": run,
-        "n_events_premove": int(len(events)), "n_trial_info": int(len(info)),
+        "n_events_premove": int(events.attrs.get("event_audit", {}).get("n_premove_total", len(events))),
+        "n_premove_matched_to_execution": int(len(events)),
+        "n_premove_without_execution": int(events.attrs.get("event_audit", {}).get("n_premove_without_execution", 0)),
+        "n_execution_unmatched": int(events.attrs.get("event_audit", {}).get("n_execution_unmatched", 0)),
+        "n_hit_unmatched": int(events.attrs.get("event_audit", {}).get("n_hit_unmatched", 0)),
+        "n_hit_timing_inconsistent": int(events.attrs.get("event_audit", {}).get("n_hit_timing_inconsistent_when_duration_present", 0)),
+        "n_trial_info": int(len(info)),
         "n_aligned_OUT": int(len(out_records)), "n_matched": int(len(matched_event_indices)),
         "n_alignment_qc_pass": int(sum(r["passed_alignment_qc"] for r in rows)),
         "n_alignment_qc_fail": int(sum(not r["passed_alignment_qc"] for r in rows)),
