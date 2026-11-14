@@ -19,6 +19,7 @@ import numpy as np
 import pandas as pd
 import scipy
 from scipy.io import loadmat
+from scipy.integrate import trapezoid
 from scipy.signal import butter, periodogram, sosfilt
 
 
@@ -287,7 +288,7 @@ def eeg_features(epoch_uv: np.ndarray, fs: float, channel_names: list[str]) -> d
         out[f"eeg_{safe_ch}_line_length"] = float(np.mean(np.abs(np.diff(sig))))
         for band, (lo, hi) in bands.items():
             mask = (freq >= lo) & (freq < hi)
-            bp = float(np.trapezoid(power[ch_i, mask], freq[mask])) if mask.sum() > 1 else np.nan
+            bp = float(trapezoid(power[ch_i, mask], freq[mask])) if mask.sum() > 1 else np.nan
             out[f"eeg_{safe_ch}_{band}_logpower"] = float(np.log(max(bp, 1e-20)))
     return out
 
