@@ -525,7 +525,10 @@ def main() -> None:
     errors: list[dict] = []
     for participant in args.participants:
         for hand in ("L", "R"):
-            for run in range(1, 5):
+            # The released BIDS dataset has six runs per hand for sub-04
+            # and sub-05, and four runs per hand for the other participants.
+            n_runs = 6 if participant in {"sub-04", "sub-05"} else 4
+            for run in range(1, n_runs + 1):
                 try:
                     rows, report = process_run(
                         dataset, participant, hand, run,
