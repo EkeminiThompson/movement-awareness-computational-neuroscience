@@ -531,8 +531,13 @@ def main() -> None:
                     })
 
     if not all_rows:
+        output.mkdir(parents=True, exist_ok=True)
+        pd.DataFrame(run_reports).to_csv(output / 'run_audit.csv', index=False)
+        (output / 'audit_errors.json').write_text(json.dumps(errors, indent=2), encoding='utf-8')
+        first_errors = errors[:12]
         raise RuntimeError(
-            "No trial rows were extracted. Inspect audit_errors.json and verify the release layout."
+            'No trial rows were extracted. First run errors: ' +
+            json.dumps(first_errors, ensure_ascii=False)
         )
     table = pd.DataFrame(all_rows)
     table.to_csv(output / "all_matched_trials_pre_qc.csv", index=False)
