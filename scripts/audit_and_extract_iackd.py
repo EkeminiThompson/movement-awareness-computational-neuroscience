@@ -301,24 +301,27 @@ def extract_kinematics(out_record: Any) -> dict[str, float]:
     t = vector(field(out_record, "t_ms"))
     x = vector(field(out_record, "x_mm"))
     y = vector(field(out_record, "y_mm"))
-    if t.size == 0 or x.size != t.size or y.size != t.size:
-        raise ValueError("OUT record has incompatible t_ms/x_mm/y_mm arrays")
-    good = np.isfinite(t) & np.isfinite(x) & np.isfinite(y) & (t >= 0)
+    z = vector(field(out_record, "z_mm"))
+    if t.size == 0 or x.size != t.size or y.size != t.size or z.size != t.size:
+        raise ValueError("OUT record has incompatible t_ms/x_mm/y_mm/z_mm arrays")
+    good = (
+        np.isfinite(t) & np.isfinite(x) & np.isfinite(y) & np.isfinite(z) & (t >= 0)
+    )
     if good.sum() < 5:
-        raise ValueError("Fewer than five valid post-onset hand-position samples")
+        raise ValueError("Fewer than five valid post-onset 3-D hand-position samples")
     ids = np.flatnonzero(good)
     # Keep the longest contiguous valid run; do not bridge NaN gaps.
     breaks = np.where(np.diff(ids) > 1)[0]
     groups = np.split(ids, breaks + 1)
     ids = max(groups, key=len)
     if len(ids) < 5:
-        raise ValueError("No sufficiently long contiguous kinematic segment")
+        raise ValueError("No sufficiently long contiguous 3-D kinematic segment")
     tt = t[ids]
-    xy = np.column_stack([x[ids], y[ids]])
+    xyz = np.column_stack([x[ids], y[ids], z[ids]])
     dt = np.diff(tt) / 1000.0
     if np.any(dt <= 0):
         raise ValueError("Kinematic time axis is not strictly increasing")
-    displacement = np.diff(xy, axis=0)
+    displacement = np.diff(xyz, axis=0)
     step = np.linalg.norm(displacement, axis=1)
     speed = step / dt
     return {
@@ -326,8 +329,8 @@ def extract_kinematics(out_record: Any) -> dict[str, float]:
         "path_length_mm": float(step.sum()),
         "peak_speed_mm_s": float(np.max(speed)),
         "kinematic_n_samples": int(len(ids)),
+        "kinematic_dimensions": 3,
     }
-
 
 def causal_filter(data_uv: np.ndarray, fs: float) -> np.ndarray:
     """One-pass causal Butterworth band-pass; no post-window samples influence the past."""
@@ -456,6 +459,7 @@ def process_run(dataset: Path, participant: str, hand: str, run: int,
             "qc_peak_abs_eeg_uv": peak_abs_uv,
             "raw_eeg_sampling_hz": fs,
             "causal_filter": "4th-order Butterworth 0.1-45 Hz, one-pass SOS; average reference",
+            "kinematic_source": "aligned MATLAB OUT 3-D coordinates; dataset-provided 4-Hz zero-phase-smoothed trajectories",
             **kin,
             **feat,
         }
