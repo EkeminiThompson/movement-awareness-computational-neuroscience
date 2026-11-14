@@ -535,6 +535,10 @@ def main() -> None:
     all_rows: list[dict] = []
     run_reports: list[dict] = []
     errors: list[dict] = []
+    expected_run_count = sum(
+        2 * (6 if participant in {"sub-04", "sub-05"} else 4)
+        for participant in args.participants
+    )
     for participant in args.participants:
         for hand in ("L", "R"):
             # The released BIDS dataset has six runs per hand for sub-04
@@ -579,7 +583,7 @@ def main() -> None:
         "participants_expected": 15,
         "participants_with_qc_trials": len(participant_counts),
         "participant_trial_counts": participant_counts,
-        "n_run_attempts": len(args.participants) * 8,
+        "n_run_attempts": expected_run_count,
         "n_runs_successfully_audited": len(run_reports),
         "n_run_errors": len(errors),
         "n_out_records_extracted": int(len(table)),
@@ -601,9 +605,9 @@ def main() -> None:
         "errors": errors,
     }
     (output / "audit_summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
-    if errors or len(run_reports) != len(args.participants) * 8:
+    if errors or len(run_reports) != expected_run_count:
         raise RuntimeError(
-            f"Only {len(run_reports)}/{len(args.participants) * 8} expected participant-hand-runs passed the audit; "
+            f"Only {len(run_reports)}/{expected_run_count} expected participant-hand-runs passed the audit; "
             "inspect audit_errors.json and resolve missing/failed runs before modelling."
         )
     if len(participant_counts) != 15:
