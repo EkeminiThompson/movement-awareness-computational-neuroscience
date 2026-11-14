@@ -135,16 +135,24 @@ def read_out_records(path: Path) -> list[Any]:
 def read_trial_info(path: Path) -> tuple[list[Any], float]:
     mat = load_mat(path)
     info = records(mat.get("trial_info"))
+    # The released pre-movement derivatives save the sampling rate as
+    # meta.srate (not a top-level RESAMPLE_HZ/srate variable).
     fs = scalar(mat.get("RESAMPLE_HZ"), default=np.nan)
     if not np.isfinite(fs) or fs <= 0:
-        fs = scalar(mat.get("srate"), default=200.0)
+        fs = scalar(mat.get("srate"), default=np.nan)
+    if not np.isfinite(fs) or fs <= 0:
+        fs = scalar(field(mat.get("meta"), "srate", "RESAMPLE_HZ"), default=200.0)
+    if not np.isfinite(fs) or fs <= 0:
+        raise ValueError(f"Invalid pre-movement sampling rate in {path}: {fs}")
     if not info:
         raise ValueError(f"No trial_info records found in {path}")
     return info, fs
 
 
 def trial_info_time_seconds(info: Any, fs: float) -> float:
-    sample = scalar(field(info, "t14_samp", "t14_sample", "mark14_samp", "event14_sample"))
+    # In the published MATLAB export, trial_info stores t14 as an EEGLAB
+    # sample latency (with i14 as the event index), at meta.srate Hz.
+    sample = scalar(field(info, "t14_samp", "t14_sample", "mark14_samp", "event14_sample", "t14"))
     if not np.isfinite(sample):
         return np.nan
     return sample / fs
@@ -265,16 +273,20 @@ def map_out_index_to_trial_info(out_record: Any, info: list[Any], fs: float,
     if not np.isfinite(raw_idx):
         raise ValueError("OUT record has no eeg_seg_index/eeg_seg_idx")
     idx = int(raw_idx)
-    valid_idx = [
-        i for i, item in enumerate(info)
-        if bool(scalar(field(item, "valid"), default=0))
-    ]
-    candidates = set()
-    for j in (idx - 1, idx):
-        if 0 <= j < len(info):
-            candidates.add(j)
-        if 0 <= j < len(valid_idx):
-            candidates.add(valid_idx[j])
+    # The upstream MATLAB align_eeg_leap.m stores Pairs.eeg_seg_idx as
+    # info_i, the one-based index into trial_info itself. export_eeg_leap_aligned.m
+    # copies that value to OUT.eeg_seg_idx. It is NOT an index into the
+    # compressed list of valid trials. Resolve it directly and fail closed.
+    if idx < 1 or idx > len(info):
+        raise ValueError(
+            f"OUT eeg_seg_idx={idx} is outside trial_info (1..{len(info)})"
+        )
+    info_i = idx - 1
+    if not bool(scalar(field(info[info_i], "valid"), default=0)):
+        raise ValueError(
+            f"OUT eeg_seg_idx={idx} points to trial_info.valid=False"
+        )
+    candidates = {info_i}
     scored = []
     event_times = events.event14_s.to_numpy(dtype=float)
     for info_i in candidates:
