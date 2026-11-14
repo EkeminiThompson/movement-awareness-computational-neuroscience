@@ -36,6 +36,19 @@ jobs:
           if "IACKD" not in d.get("Name", ""):
               raise SystemExit("Downloaded dataset name is not IACKD; stop and inspect provenance.")
           PY
+      - name: Inventory downloaded IACKD file layout
+        run: |
+          mkdir -p reports/iackd
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          manifest=json.loads(Path("data/on006840/nemar_manifest.json").read_text())
+          paths=[x["path"] for x in manifest]
+          selected=[p for p in paths if p.startswith("sub-01/") and any(k in p for k in ("events.tsv", ".vhdr", "pre_eeg", "eeg_leap"))]
+          text="Manifest entries: %d\\nSelected sub-01 files:\\n%s\\n" % (len(paths), "\\n".join(selected[:200]))
+          Path("reports/iackd/manifest_inventory.txt").write_text(text)
+          print(text)
+          PY
       - name: Install analysis dependencies
         run: python -m pip install -r requirements-iackd-analysis.txt
       - name: Audit MATLAB arrays, event matching and extract causal EEG features
@@ -53,6 +66,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: iackd-audit-and-results
-          path: reports/iackd/
+          path: |
+            reports/iackd/
+            data/on006840/nemar_manifest.json
+            data/on006840/dataset_description.json
           if-no-files-found: warn
           retention-days: 30
