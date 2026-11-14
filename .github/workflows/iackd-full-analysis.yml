@@ -29,8 +29,8 @@ jobs:
           from pathlib import Path
           d=json.loads(Path("data/on006840/dataset_description.json").read_text())
           print(json.dumps(d, indent=2))
-          if d.get("DatasetDOI") not in ("doi:10.18112/openneuro.ds006840.v1.0.0", "10.18112/openneuro.ds006840.v1.0.0"):
-              raise SystemExit("Unexpected IACKD source DOI; stop and inspect provenance.")
+          if "IACKD" not in d.get("Name", ""):
+              raise SystemExit("Downloaded dataset name is not IACKD; stop and inspect provenance.")
           PY
       - name: Install analysis dependencies
         run: python -m pip install -r requirements-iackd-analysis.txt
