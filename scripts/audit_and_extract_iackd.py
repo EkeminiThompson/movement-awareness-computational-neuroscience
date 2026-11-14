@@ -378,8 +378,17 @@ def process_run(dataset: Path, participant: str, hand: str, run: int,
     prefix = f"{participant}_task-ihc_acq-{acq}_run-{run_id}"
     event_path = subdir / "eeg" / f"{prefix}_events.tsv"
     vhdr_path = subdir / "eeg" / f"{prefix}_eeg.vhdr"
-    pre_path = dataset / "derivatives" / "premove" / participant / "ihc" / f"pre_eeg_{hand}{run}.mat"
-    aligned_path = dataset / "derivatives" / "aligned" / participant / "ihc" / f"eeg_leap_{hand}{run}.mat"
+    # NEMAR/OpenNeuro v1.0.0 stores these MATLAB derivatives under
+    # derivatives/pre-movement and derivatives/movement-execution. Filenames
+    # include the participant, task, and BIDS run identifiers.
+    pre_path = (
+        dataset / "derivatives" / "pre-movement" / participant / "ihc"
+        / f"{participant}_task-ihc_run-{run_id}_pre_eeg_{hand}{run}.mat"
+    )
+    aligned_path = (
+        dataset / "derivatives" / "movement-execution" / participant / "ihc"
+        / f"{participant}_task-ihc_run-{run_id}_eeg_leap_{hand}{run}.mat"
+    )
     missing = [str(p) for p in (event_path, vhdr_path, pre_path, aligned_path) if not p.exists()]
     if missing:
         raise FileNotFoundError("Missing required run files: " + "; ".join(missing))
