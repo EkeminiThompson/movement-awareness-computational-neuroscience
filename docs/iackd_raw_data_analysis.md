@@ -49,3 +49,12 @@ The GitHub Actions workflow uses the same version-pinned manifest downloader and
 The workflow must stop if any of the 15 participants is missing, event matching is ambiguous, the raw EEG interval cannot be verified, or either condition is absent. A successful run produces three LOPO experiments, each with 15 outer folds. Scaling and Ridge tuning remain inside grouped training-participant folds. Condition-specific scores and participant-level bootstrap intervals are reported.
 
 The 6,671 valid-trial figure in the 2026 data descriptor and the 6,720 figure in the original project README are reference counts, not acceptance targets to force. The file-level audit determines the observed counts. Never claim that the discrepancy is resolved until the inventory and exclusions explain it.
+
+
+## Ethics approvals and participant consent (source dataset)
+
+The original IACKD data descriptor explicitly reports that all experimental procedures complied with the Declaration of Helsinki and were approved by the **Ethics Committee of the First Hospital of Qinhuangdao (Approval No. 2024G006)**. The article further states that the committee approved both the experimental protocol and anonymized public sharing of the dataset. **Written informed consent was obtained from every participant before data collection**, and the consent form explicitly covered anonymized data storage, sharing, and open public release for scientific research. The article also states that the released data were de-identified before publication.
+
+This is the ethics approval and consent reported by the original dataset investigators; it is not an approval granted to the present secondary-analysis project. The current project must follow the applicable institutional requirements for secondary analysis and must not imply that the original approval automatically covers a new research protocol.
+
+Source: Cai et al. (2026), *Intention-Action Conflict EEG-Hand Kinematics Dataset for Unimanual Control under Congruent and Incongruent Conditions*, Scientific Data 13, Article 933. https://doi.org/10.1038/s41597-026-07146-x
