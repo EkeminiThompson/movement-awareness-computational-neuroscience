@@ -129,6 +129,12 @@ def records(value: Any) -> list[Any]:
         for i in range(n):
             row = {}
             for key, item in value.items():
+                # MATLAB cell arrays containing variable-length sample vectors
+                # become ragged Python lists; np.asarray(item) raises on these.
+                # Split a per-record list before attempting ndarray conversion.
+                if n > 1 and isinstance(item, (list, tuple)) and len(item) == n:
+                    row[key] = item[i]
+                    continue
                 arr = as_array(item)
                 if arr is None or arr.ndim == 0:
                     row[key] = item
