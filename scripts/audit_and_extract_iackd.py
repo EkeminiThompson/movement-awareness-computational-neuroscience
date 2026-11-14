@@ -70,9 +70,11 @@ def text_value(value: Any) -> str:
     arr = np.asarray(value).squeeze()
     if arr.size == 1:
         value = arr.item()
+    elif arr.dtype.kind in {'U', 'S'}:
+        value = ''.join(str(x) for x in arr.reshape(-1))
     if isinstance(value, bytes):
-        value = value.decode("utf-8", errors="replace")
-    return str(value).strip().strip('"').strip("'")
+        value = value.decode('utf-8', errors='replace')
+    return str(value).strip().strip(chr(34)).strip(chr(39))
 
 
 def records(value: Any) -> list[Any]:
