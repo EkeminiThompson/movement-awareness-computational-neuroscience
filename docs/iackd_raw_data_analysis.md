@@ -51,7 +51,7 @@ The workflow must stop if any of the 15 participants is missing, event matching 
 The 6,671 valid-trial figure in the 2026 data descriptor and the 6,720 figure in the original project README are reference counts, not acceptance targets to force. The file-level audit determines the observed counts. Never claim that the discrepancy is resolved until the inventory and exclusions explain it.
 
 
-## Ethics approvals and participant consent (source dataset)
+## EthicsApprovals: source article approval and participant consent
 
 The original IACKD data descriptor explicitly reports that all experimental procedures complied with the Declaration of Helsinki and were approved by the **Ethics Committee of the First Hospital of Qinhuangdao (Approval No. 2024G006)**. The article further states that the committee approved both the experimental protocol and anonymized public sharing of the dataset. **Written informed consent was obtained from every participant before data collection**, and the consent form explicitly covered anonymized data storage, sharing, and open public release for scientific research. The article also states that the released data were de-identified before publication.
 
