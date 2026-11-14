@@ -66,6 +66,7 @@ class TestIackdRawAudit(unittest.TestCase):
             "t_ms": np.array([-200, 0, 10, 20, 30, 40], dtype=float),
             "x_mm": np.array([0, 0, 1, 2, 2, 3], dtype=float),
             "y_mm": np.zeros(6),
+            "z_mm": np.zeros(6),
         }
         result = extract_kinematics(out)
         self.assertAlmostEqual(result["movement_duration_ms"], 40.0)
